@@ -46,6 +46,12 @@ func Connect(host, user string, port int, keyPath string) (*Client, error) {
 	return &Client{conn: conn}, nil
 }
 
+// Dial opens a TCP connection to addr through the SSH tunnel. The returned conn never leaves the encrypted SSH session,
+// so addr does not need to be reachable from the public internet.
+func (c *Client) Dial(addr string) (net.Conn, error) {
+	return c.conn.Dial("tcp", addr)
+}
+
 // Run executes a command on the remote host and returns its combined stdout/stderr output.
 func (c *Client) Run(cmd string) (string, error) {
 	sess, err := c.conn.NewSession()
