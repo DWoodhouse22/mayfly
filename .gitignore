@@ -10,7 +10,6 @@
 
 # Test binary, built with `go test -c`
 *.test
-mayfly
 # Code coverage profiles and other test artifacts
 *.out
 coverage.*
@@ -35,3 +34,7 @@ go.work.sum
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 !*.code-workspace
+
+# Generated files
+mayfly.conf
+mayfly
