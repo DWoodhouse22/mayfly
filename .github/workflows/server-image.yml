@@ -8,6 +8,7 @@ on:
       - internal/**
       - go.mod
       - go.sum
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
