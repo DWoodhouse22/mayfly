@@ -12,6 +12,10 @@ const containerName = "mayfly-server"
 func Start(client *sshclient.Client, image, token string) error {
 	client.Run(fmt.Sprintf("docker rm -f %s", containerName))
 
+	if out, err := client.Run(fmt.Sprintf("docker pull %s", image)); err != nil {
+		return fmt.Errorf("pulling image %s: %w\n%s", image, err, out)
+	}
+
 	cmd := fmt.Sprintf(
 		"docker run -d --name %s --cap-add NET_ADMIN --device /dev/net/tun --sysctl net.ipv4.ip_forward=1 -p 51820:51820/udp -e MAYFLY_TOKEN=%s %s",
 		containerName,
@@ -28,7 +32,7 @@ func Start(client *sshclient.Client, image, token string) error {
 // IP returns the Docker bridge IP of the running container, used to reach its HTTP API through the SSH tunnel.
 func IP(client *sshclient.Client) (string, error) {
 	out, err := client.Run(fmt.Sprintf(
-		"docker inspect --format '{{.NetworkSettings.IPAddress}}' %s",
+		"docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' %s",
 		containerName,
 	))
 	if err != nil {
