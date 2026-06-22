@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	sshclient "mayfly/internal/ssh"
 	"os"
 
@@ -43,13 +42,13 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 
 	client, err := sshclient.Connect(flagHost, flagUser, flagPort, flagKey)
 	if err != nil {
-		log.Fatalf("SSH connection failed: %v", err)
+		return fmt.Errorf("SSH connection failed: %v", err)
 	}
 	defer client.Close()
 
 	out, err := client.Run("uname -sr")
 	if err != nil {
-		log.Fatalf("command failed: %v", err)
+		return fmt.Errorf("command failed: %v", err)
 	}
 
 	fmt.Printf("Connected. Remote is running: %s\n", out)
@@ -66,7 +65,7 @@ func init() {
 	serverCmd.AddCommand(serverStopCmd)
 
 	serverStartCmd.Flags().StringVar(&flagHost, "host", "", "Hostname of the VPS")
-	serverStartCmd.Flags().StringVarP(&flagUser, "user", "u", "", "SSH login user")
+	serverStartCmd.Flags().StringVarP(&flagUser, "user", "u", "root", "SSH login user")
 	serverStartCmd.Flags().StringVarP(&flagKey, "key", "k", "", "Path to SSH private key file")
 	serverStartCmd.Flags().IntVarP(&flagPort, "port", "p", 22, "SSH port")
 	serverStartCmd.Flags().StringVarP(&flagImage, "image", "i", "ghcr.io/DWoodhouse22/mayfly-server:latest", "Server docker image")
