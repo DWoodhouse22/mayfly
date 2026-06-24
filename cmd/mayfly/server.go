@@ -45,21 +45,16 @@ var serverStopCmd = &cobra.Command{
 }
 
 func runServerStart(cmd *cobra.Command, args []string) error {
-	if err := preFlightChecks(); err != nil {
+	ssh, err := preFlightChecks()
+	if err != nil {
 		return fmt.Errorf("pre-flight checks failed: %w", err)
 	}
+	defer ssh.Close()
 
 	keys, err := keygen.GenerateKeyPair()
 	if err != nil {
 		return fmt.Errorf("generating keypair: %w", err)
 	}
-
-	log.Printf("connecting to %s@%s:%d...", flagUser, flagHost, flagPort)
-	ssh, err := sshclient.Connect(flagHost, flagUser, flagPort, flagKey)
-	if err != nil {
-		return fmt.Errorf("SSH connection failed: %w", err)
-	}
-	defer ssh.Close()
 
 	log.Printf("starting server container...")
 	if err := docker.Start(ssh, flagImage, flagToken); err != nil {
@@ -102,15 +97,21 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func preFlightChecks() error {
+func preFlightChecks() (*sshclient.Client, error) {
 	if err := confirmToken(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := confirmWgInstall(); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	log.Printf("connecting to %s@%s:%d...", flagUser, flagHost, flagPort)
+	ssh, err := sshclient.Connect(flagHost, flagUser, flagPort, flagKey)
+	if err != nil {
+		return nil, fmt.Errorf("SSH connection failed: %w", err)
+	}
+	return ssh, nil
 }
 
 func confirmToken() error {
@@ -130,7 +131,7 @@ func confirmWgInstall() error {
 	//Windows might not have added wg to PATH
 	if runtime.GOOS == "windows" {
 		// Default location
-		path := `C:\Program Files\Wireguard\wg.exe`
+		path := `C:\Program Files\WireGuard\wg.exe`
 		if _, err := os.Stat(path); err == nil {
 			return nil
 		}
