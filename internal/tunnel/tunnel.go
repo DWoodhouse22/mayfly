@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mayfly/internal/config"
 	"mayfly/internal/keygen"
+	"os"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -42,6 +43,11 @@ func Up(config *config.ClientConfig) (*device.Device, error) {
 	if err := dev.Up(); err != nil {
 		return nil, fmt.Errorf("starting wireguard tunnel: %w", err)
 	}
+
+	if err := setupRouting(tunDevice, config); err != nil {
+		return nil, err
+	}
+
 	return dev, nil
 }
 
@@ -49,5 +55,11 @@ func Down(dev *device.Device) error {
 	if err := dev.Down(); err != nil {
 		return fmt.Errorf("tearing down wireguard tunnel: %w", err)
 	}
+
+	if err := teardownRouting(); err != nil {
+		return fmt.Errorf("tearing down routing: %w", err)
+	}
+
+	os.Remove(wintunDllPath)
 	return nil
 }
