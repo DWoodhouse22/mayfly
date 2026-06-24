@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -43,24 +45,16 @@ var serverStopCmd = &cobra.Command{
 }
 
 func runServerStart(cmd *cobra.Command, args []string) error {
-	if flagToken == "" {
-		flagToken = os.Getenv("MAYFLY_TOKEN")
+	ssh, err := preFlightChecks()
+	if err != nil {
+		return fmt.Errorf("pre-flight checks failed: %w", err)
 	}
-	if flagToken == "" {
-		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
-	}
+	defer ssh.Close()
 
 	keys, err := keygen.GenerateKeyPair()
 	if err != nil {
 		return fmt.Errorf("generating keypair: %w", err)
 	}
-
-	log.Printf("connecting to %s@%s:%d...", flagUser, flagHost, flagPort)
-	ssh, err := sshclient.Connect(flagHost, flagUser, flagPort, flagKey)
-	if err != nil {
-		return fmt.Errorf("SSH connection failed: %w", err)
-	}
-	defer ssh.Close()
 
 	log.Printf("starting server container...")
 	if err := docker.Start(ssh, flagImage, flagToken); err != nil {
@@ -101,6 +95,59 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 	fmt.Printf("When done:\n  sudo wg-quick down %s\n  mayfly server stop --host %s\n", flagOutput, flagHost)
 
 	return nil
+}
+
+func preFlightChecks() (*sshclient.Client, error) {
+	if err := confirmToken(); err != nil {
+		return nil, err
+	}
+
+	if err := confirmWgInstall(); err != nil {
+		return nil, err
+	}
+
+	log.Printf("connecting to %s@%s:%d...", flagUser, flagHost, flagPort)
+	ssh, err := sshclient.Connect(flagHost, flagUser, flagPort, flagKey)
+	if err != nil {
+		return nil, fmt.Errorf("SSH connection failed: %w", err)
+	}
+	return ssh, nil
+}
+
+func confirmToken() error {
+	if flagToken == "" {
+		flagToken = os.Getenv("MAYFLY_TOKEN")
+	}
+	if flagToken == "" {
+		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
+	}
+	return nil
+}
+
+func confirmWgInstall() error {
+	if _, err := exec.LookPath("wg"); err == nil {
+		return nil
+	}
+	//Windows might not have added wg to PATH
+	if runtime.GOOS == "windows" {
+		// Default location
+		path := `C:\Program Files\WireGuard\wg.exe`
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("Wireguard is required and was not found. Install it: %s", wireguardInstallHint())
+}
+
+func wireguardInstallHint() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "brew install wireguard-tools"
+	case "windows":
+		return "https://www.wireguard.com/install"
+	default:
+		return "sudo apt install wireguard  # or your distro's equivalent"
+	}
 }
 
 func runServerStop(cmd *cobra.Command, args []string) error {
