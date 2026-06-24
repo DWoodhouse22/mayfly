@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -43,11 +45,8 @@ var serverStopCmd = &cobra.Command{
 }
 
 func runServerStart(cmd *cobra.Command, args []string) error {
-	if flagToken == "" {
-		flagToken = os.Getenv("MAYFLY_TOKEN")
-	}
-	if flagToken == "" {
-		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
+	if err := preFlightChecks(); err != nil {
+		return fmt.Errorf("pre-flight checks failed: %w", err)
 	}
 
 	keys, err := keygen.GenerateKeyPair()
@@ -101,6 +100,53 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 	fmt.Printf("When done:\n  sudo wg-quick down %s\n  mayfly server stop --host %s\n", flagOutput, flagHost)
 
 	return nil
+}
+
+func preFlightChecks() error {
+	if err := confirmToken(); err != nil {
+		return err
+	}
+
+	if err := confirmWgInstall(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func confirmToken() error {
+	if flagToken == "" {
+		flagToken = os.Getenv("MAYFLY_TOKEN")
+	}
+	if flagToken == "" {
+		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
+	}
+	return nil
+}
+
+func confirmWgInstall() error {
+	if _, err := exec.LookPath("wg"); err == nil {
+		return nil
+	}
+	//Windows might not have added wg to PATH
+	if runtime.GOOS == "windows" {
+		// Default location
+		path := `C:\Program Files\Wireguard\wg.exe`
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("Wireguard is required and was not found. Install it: %s", wireguardInstallHint())
+}
+
+func wireguardInstallHint() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "brew install wireguard-tools"
+	case "windows":
+		return "https://www.wireguard.com/install"
+	default:
+		return "sudo apt install wireguard  # or your distro's equivalent"
+	}
 }
 
 func runServerStop(cmd *cobra.Command, args []string) error {
