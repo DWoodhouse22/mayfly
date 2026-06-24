@@ -33,7 +33,6 @@ func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 	}
 	originalGateway = gateway
 	originalLUID = wanLUID
-	// clean up any leftover route from a previous unclean shutdown
 	host, _, err := net.SplitHostPort(config.Endpoint)
 	if err != nil {
 		return err
@@ -45,6 +44,7 @@ func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 	}
 	vpsAddr = addr
 
+	// clean up any leftover route from a previous unclean shutdown
 	originalLUID.DeleteRoute(netip.PrefixFrom(vpsAddr, 32), originalGateway)
 	if err := originalLUID.AddRoute(netip.PrefixFrom(vpsAddr, 32), originalGateway, 0); err != nil {
 		return fmt.Errorf("adding VPS host route: %w", err)
