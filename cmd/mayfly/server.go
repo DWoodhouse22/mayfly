@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
-	"runtime"
 	"syscall"
 	"time"
 
@@ -21,13 +19,12 @@ import (
 )
 
 var (
-	flagHost   string
-	flagUser   string
-	flagKey    string
-	flagPort   int
-	flagImage  string
-	flagToken  string
-	flagOutput string
+	flagHost  string
+	flagUser  string
+	flagKey   string
+	flagPort  int
+	flagImage string
+	flagToken string
 )
 
 var serverCmd = &cobra.Command{
@@ -111,10 +108,6 @@ func preFlightChecks() (*sshclient.Client, error) {
 		return nil, err
 	}
 
-	if err := confirmWgInstall(); err != nil {
-		return nil, err
-	}
-
 	log.Printf("connecting to %s@%s:%d...", flagUser, flagHost, flagPort)
 	ssh, err := sshclient.Connect(flagHost, flagUser, flagPort, flagKey)
 	if err != nil {
@@ -131,32 +124,6 @@ func confirmToken() error {
 		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
 	}
 	return nil
-}
-
-func confirmWgInstall() error {
-	if _, err := exec.LookPath("wg"); err == nil {
-		return nil
-	}
-	//Windows might not have added wg to PATH
-	if runtime.GOOS == "windows" {
-		// Default location
-		path := `C:\Program Files\WireGuard\wg.exe`
-		if _, err := os.Stat(path); err == nil {
-			return nil
-		}
-	}
-	return fmt.Errorf("Wireguard is required and was not found. Install it: %s", wireguardInstallHint())
-}
-
-func wireguardInstallHint() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "brew install wireguard-tools"
-	case "windows":
-		return "https://www.wireguard.com/install"
-	default:
-		return "sudo apt install wireguard  # or your distro's equivalent"
-	}
 }
 
 func runServerStop(cmd *cobra.Command, args []string) error {
