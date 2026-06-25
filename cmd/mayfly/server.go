@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"runtime"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,16 +15,16 @@ import (
 	"mayfly/internal/docker"
 	"mayfly/internal/keygen"
 	sshclient "mayfly/internal/ssh"
+	"mayfly/internal/tunnel"
 )
 
 var (
-	flagHost   string
-	flagUser   string
-	flagKey    string
-	flagPort   int
-	flagImage  string
-	flagToken  string
-	flagOutput string
+	flagHost  string
+	flagUser  string
+	flagKey   string
+	flagPort  int
+	flagImage string
+	flagToken string
 )
 
 var serverCmd = &cobra.Command{
@@ -78,31 +78,33 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cfg := config.ClientConfig{
+	cfg := &config.ClientConfig{
 		PrivateKey:      keys.PrivateKey,
 		ClientIP:        reg.ClientIP,
 		DNS:             reg.DNS,
 		ServerPublicKey: reg.ServerPublicKey,
 		Endpoint:        fmt.Sprintf("%s:51820", flagHost),
 	}
-	if err := config.WriteClient(flagOutput, cfg); err != nil {
+
+	dev, err := tunnel.Up(cfg)
+	if err != nil {
 		return err
 	}
 
-	fmt.Printf("\nVPN server is running.\n")
-	fmt.Printf("Client config written to: %s\n\n", flagOutput)
-	fmt.Printf("Connect with:\n  sudo wg-quick up %s\n\n", flagOutput)
-	fmt.Printf("When done:\n  sudo wg-quick down %s\n  mayfly server stop --host %s\n", flagOutput, flagHost)
+	fmt.Printf("\nVPN server is running.\nPress Ctrl+C to disconnect.\n\n")
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
 
-	return nil
+	fmt.Println("\nDisconnecting...")
+	if err := tunnel.Down(dev); err != nil {
+		return err
+	}
+	return docker.Stop(ssh)
 }
 
 func preFlightChecks() (*sshclient.Client, error) {
 	if err := confirmToken(); err != nil {
-		return nil, err
-	}
-
-	if err := confirmWgInstall(); err != nil {
 		return nil, err
 	}
 
@@ -122,32 +124,6 @@ func confirmToken() error {
 		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
 	}
 	return nil
-}
-
-func confirmWgInstall() error {
-	if _, err := exec.LookPath("wg"); err == nil {
-		return nil
-	}
-	//Windows might not have added wg to PATH
-	if runtime.GOOS == "windows" {
-		// Default location
-		path := `C:\Program Files\WireGuard\wg.exe`
-		if _, err := os.Stat(path); err == nil {
-			return nil
-		}
-	}
-	return fmt.Errorf("Wireguard is required and was not found. Install it: %s", wireguardInstallHint())
-}
-
-func wireguardInstallHint() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "brew install wireguard-tools"
-	case "windows":
-		return "https://www.wireguard.com/install"
-	default:
-		return "sudo apt install wireguard  # or your distro's equivalent"
-	}
 }
 
 func runServerStop(cmd *cobra.Command, args []string) error {
@@ -179,5 +155,4 @@ func init() {
 
 	serverStartCmd.Flags().StringVarP(&flagImage, "image", "i", "ghcr.io/dwoodhouse22/mayfly-server:latest", "server Docker image")
 	serverStartCmd.Flags().StringVarP(&flagToken, "token", "t", "", "auth token (or set MAYFLY_TOKEN)")
-	serverStartCmd.Flags().StringVarP(&flagOutput, "output", "o", "mayfly.conf", "path to write the WireGuard client config")
 }

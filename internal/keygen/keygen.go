@@ -3,6 +3,7 @@ package keygen
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 
 	"golang.org/x/crypto/curve25519"
@@ -34,4 +35,12 @@ func GenerateKeyPair() (*KeyPair, error) {
 		PrivateKey: base64.StdEncoding.EncodeToString(priv),
 		PublicKey:  base64.StdEncoding.EncodeToString(pub),
 	}, nil
+}
+
+func EncodeToHex(key string) (string, error) {
+	b64Key, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b64Key), nil
 }
