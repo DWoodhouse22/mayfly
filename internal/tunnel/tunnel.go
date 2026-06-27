@@ -4,22 +4,13 @@ import (
 	"fmt"
 	"mayfly/internal/config"
 	"mayfly/internal/keygen"
-	"os"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-var wintunDllPath string
-
 func Up(config *config.ClientConfig) (*device.Device, error) {
-	dllPath, err := setupWintun()
-	if err != nil {
-		return nil, fmt.Errorf("setting up wintun: %w", err)
-	}
-	wintunDllPath = dllPath
-
 	tunDevice, err := tun.CreateTUN("mayfly0", 1420)
 	if err != nil {
 		return nil, fmt.Errorf("creating TUN: %w", err)
@@ -60,6 +51,5 @@ func Down(dev *device.Device) error {
 		return fmt.Errorf("tearing down routing: %w", err)
 	}
 
-	os.Remove(wintunDllPath)
 	return nil
 }
