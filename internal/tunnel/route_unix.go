@@ -17,6 +17,7 @@ var (
 	origVpsIp           net.IP
 	origGw              net.IP
 	origLIdx            int
+	tunLIdx             int
 	origResolvConf      []byte
 	usedSystemdResolved bool
 )
@@ -24,11 +25,11 @@ var (
 func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 	link, err := netlink.LinkByName("mayfly0")
 	if err != nil {
-		return err
+		return fmt.Errorf("getting net link: %w", err)
 	}
 
 	if err := netlink.LinkSetUp(link); err != nil {
-		return err
+		return fmt.Errorf("setting up net link: %w", err)
 	}
 
 	addr := &netlink.Addr{IPNet: &net.IPNet{
@@ -36,17 +37,17 @@ func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 		Mask: net.CIDRMask(32, 32),
 	}}
 	if err := netlink.AddrAdd(link, addr); err != nil {
-		return err
+		return fmt.Errorf("assigning IP to mayfly0: %w", err)
 	}
 
 	routes, err := netlink.RouteList(nil, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing routes: %w", err)
 	}
 	var best *netlink.Route
 	for i := range routes {
 		r := &routes[i]
-		if r.Dst == nil {
+		if r.Dst == nil || r.Dst.String() == "0.0.0.0/0" {
 			if best == nil || r.Priority < best.Priority {
 				best = r
 			}
@@ -60,21 +61,20 @@ func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 
 	host, _, _ := net.SplitHostPort(config.Endpoint)
 	origVpsIp = net.ParseIP(host)
-	if err := netlink.RouteAdd(&netlink.Route{
+	if err := netlink.RouteReplace(&netlink.Route{
 		LinkIndex: origLIdx,
 		Gw:        origGw,
 		Dst:       &net.IPNet{IP: origVpsIp, Mask: net.CIDRMask(32, 32)},
 	}); err != nil {
-		return err
+		return fmt.Errorf("adding VPS host route: %w", err)
 	}
 
-	tunnelGw := net.ParseIP(config.DNS)
-	if err := netlink.RouteAdd(&netlink.Route{
-		LinkIndex: link.Attrs().Index,
-		Gw:        tunnelGw,
+	tunLIdx = link.Attrs().Index
+	if err := netlink.RouteReplace(&netlink.Route{
+		LinkIndex: tunLIdx,
 		Dst:       &net.IPNet{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)},
 	}); err != nil {
-		return err
+		return fmt.Errorf("adding default tunnel route: %w", err)
 	}
 
 	usedSystemdResolved = isSystemdResolved()
@@ -91,15 +91,15 @@ func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 		const resolvPath = "/etc/resolv.conf"
 		original, err := os.ReadFile(resolvPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("reading %s: %w", resolvPath, err)
 		}
 		origResolvConf = original
 		info, err := os.Stat(resolvPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("stating %s: %w", resolvPath, err)
 		}
 		if err := writeResolvConf([]byte("nameserver "+config.DNS+"\n"), info.Mode()); err != nil {
-			return err
+			return fmt.Errorf("writing %s: %w", resolvPath, err)
 		}
 	}
 
@@ -118,14 +118,26 @@ func teardownRouting() error {
 	}); err != nil {
 		return fmt.Errorf("removing VPS host route: %w", err)
 	}
+	if err := netlink.RouteDel(&netlink.Route{
+		LinkIndex: tunLIdx,
+		Dst:       &net.IPNet{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)},
+	}); err != nil {
+		return fmt.Errorf("removing tunnel default route: %w", err)
+	}
 	return restoreDNS()
 }
 
 func restoreDNS() error {
 	if usedSystemdResolved {
-		return exec.Command("resolvectl", "revert", "mayfly0").Run()
+		if err := exec.Command("resolvectl", "revert", "mayfly0").Run(); err != nil {
+			return fmt.Errorf("reverting DNS via resolvectl: %w", err)
+		}
+		return nil
 	}
-	return writeResolvConf(origResolvConf, 0644)
+	if err := writeResolvConf(origResolvConf, 0644); err != nil {
+		return fmt.Errorf("restoring /etc/resolv.conf: %w", err)
+	}
+	return nil
 }
 
 func writeResolvConf(content []byte, mode os.FileMode) error {
