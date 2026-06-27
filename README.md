@@ -6,7 +6,8 @@ Mayfly exists in response to growing government pressure on VPN providers, inclu
 ## Supported Platforms
 | OS      | Architecture    | Status      |
 |---------|-----------------|-------------|
-| Windows | amd64           | ✓           | 
+| Windows | amd64           | ✓           |
+| Windows | arm64, arm, x86 | Untested    |
 | Linux   | amd64           | Coming soon |
 | Linux   | arm64           | Coming soon |
 

@@ -21,6 +21,9 @@ jobs:
       - name: Build binaries
         run: |
           GOOS=windows GOARCH=amd64 go build -o dist/mayfly-windows-amd64.exe ./cmd/mayfly/
+          GOOS=windows GOARCH=arm64 go build -o dist/mayfly-windows-arm64.exe ./cmd/mayfly/
+          GOOS=windows GOARCH=arm go build -o dist/mayfly-windows-arm.exe ./cmd/mayfly/
+          GOOS=windows GOARCH=386 go build -o dist/mayfly-windows-x86.exe ./cmd/mayfly/
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
