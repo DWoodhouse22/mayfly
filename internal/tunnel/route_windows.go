@@ -7,6 +7,7 @@ import (
 	"mayfly/internal/config"
 	"net"
 	"net/netip"
+	"os"
 
 	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/tun"
@@ -18,9 +19,15 @@ var (
 	originalGateway netip.Addr
 	tunnelLUID      winipcfg.LUID
 	vpsAddr         netip.Addr
+	wintunDllPath   string
 )
 
 func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
+	dllPath, err := setupWintun()
+	if err != nil {
+		return fmt.Errorf("setting up wintun: %w", err)
+	}
+	wintunDllPath = dllPath
 	nativeTun := tunDevice.(*tun.NativeTun)
 	tunnelLUID = winipcfg.LUID(nativeTun.LUID())
 	if err := assignAddress(tunnelLUID, config.ClientIP); err != nil {
@@ -94,5 +101,9 @@ func teardownRouting() error {
 	if err := originalLUID.DeleteRoute(netip.PrefixFrom(vpsAddr, 32), originalGateway); err != nil {
 		return err
 	}
-	return tunnelLUID.SetDNS(windows.AF_INET, nil, nil)
+	if err := tunnelLUID.SetDNS(windows.AF_INET, nil, nil); err != nil {
+		return err
+	}
+
+	return os.Remove(wintunDllPath)
 }

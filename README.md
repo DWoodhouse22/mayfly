@@ -8,8 +8,8 @@ Mayfly exists in response to growing government pressure on VPN providers, inclu
 |---------|-----------------|-------------|
 | Windows | amd64           | ✓           |
 | Windows | arm64, arm, x86 | Untested    |
-| Linux   | amd64           | Coming soon |
-| Linux   | arm64           | Coming soon |
+| Linux   | amd64           | ✓           |
+| Linux   | arm64           | Untested    |
 
 >Note: MacOS is unlikely to be supported as this is a free, proof-of-concept project. MacOS users can try [v0.1.1-alpha](https://github.com/DWoodhouse22/mayfly/releases/tag/v0.1.1-alpha) which requires manually installing WireGuard
 
