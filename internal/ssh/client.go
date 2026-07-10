@@ -69,12 +69,14 @@ func (c *Client) Close() error {
 }
 
 func authMethods(keyPath string) ([]ssh.AuthMethod, error) {
-	var methods []ssh.AuthMethod
+	var signers []ssh.Signer
 
-	// Prefer SSH agent so the key never has to be read from disk.
+	// Prefer SSH agent identities so the key never has to be read from disk.
 	if sock := os.Getenv("SSH_AUTH_SOCK"); sock != "" {
 		if conn, err := net.Dial("unix", sock); err == nil {
-			methods = append(methods, ssh.PublicKeysCallback(agent.NewClient(conn).Signers))
+			if agentSigners, err := agent.NewClient(conn).Signers(); err == nil {
+				signers = append(signers, agentSigners...)
+			}
 		}
 	}
 
@@ -88,15 +90,15 @@ func authMethods(keyPath string) ([]ssh.AuthMethod, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing SSH key %s: %w", p, err)
 		}
-		methods = append(methods, ssh.PublicKeys(signer))
+		signers = append(signers, signer)
 		break
 	}
 
-	if len(methods) == 0 {
+	if len(signers) == 0 {
 		return nil, fmt.Errorf("no SSH authentication methods available (tried agent and %v)", candidates)
 	}
 
-	return methods, nil
+	return []ssh.AuthMethod{ssh.PublicKeys(signers...)}, nil
 }
 
 // keyPaths returns the key file(s) to try. When an explicit path is given that
