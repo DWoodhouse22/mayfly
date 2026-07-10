@@ -44,10 +44,10 @@ Two pitfalls to be aware of:
 
 **Start a session**
 ```
-mayfly server start --host <vps-ip> --user <ssh-user> --token <random-string> --export /path/to/client.conf
+mayfly server start --host <vps-ip> --user <ssh-user> --export /path/to/client.conf
 ```
 Specify an SSH key with `--key path/to/key-file`. It will default to standard SSH key names: `id_ed25519`, `id_ecdsa`, or `id_rsa`.  
-`--token <random-string>` required. This is the token you will use to add secondary clients to the same VPN.  
+`--token <random-string>` optional. This is the token you will use to add secondary clients to the same VPN. If omitted (and `MAYFLY_TOKEN` isn't set), one is generated and printed for you.  
 `--export` optional. Writes the WireGuard config file which can be imported to other WireGuard clients
 This SSHes into your VPS, pulls and starts the container, and creates the WireGuard tunnel. The process blocks until Ctrl+C which disconnects the tunnel and removes the container.
 
