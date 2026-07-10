@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -128,9 +130,23 @@ func confirmToken() error {
 	if flagToken == "" {
 		flagToken = os.Getenv("MAYFLY_TOKEN")
 	}
+
 	if flagToken == "" {
-		return fmt.Errorf("--token is required (or set MAYFLY_TOKEN)")
+		if err := generateToken(); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func generateToken() error {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Errorf("generating random token: %w", err)
+	}
+	flagToken = hex.EncodeToString(b)
+	fmt.Printf("Generated auth token: %s\n", flagToken)
+	fmt.Println("Save this to add secondary clients to this VPN.")
 	return nil
 }
 
