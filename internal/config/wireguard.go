@@ -26,7 +26,7 @@ type ClientConfig struct {
 	Endpoint        string // host:port
 }
 
-func WriteClient(path string, cfg ClientConfig) error {
+func WriteClient(path string, cfg *ClientConfig) error {
 	tmpl, err := template.New("wg").Parse(clientConfigTemplate)
 	if err != nil {
 		return fmt.Errorf("error parsing config template: %w", err)

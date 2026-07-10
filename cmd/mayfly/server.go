@@ -19,12 +19,13 @@ import (
 )
 
 var (
-	flagHost  string
-	flagUser  string
-	flagKey   string
-	flagPort  int
-	flagImage string
-	flagToken string
+	flagHost   string
+	flagUser   string
+	flagKey    string
+	flagPort   int
+	flagImage  string
+	flagToken  string
+	flagExport string
 )
 
 var serverCmd = &cobra.Command{
@@ -84,6 +85,13 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 		DNS:             reg.DNS,
 		ServerPublicKey: reg.ServerPublicKey,
 		Endpoint:        fmt.Sprintf("%s:51820", flagHost),
+	}
+
+	if flagExport != "" {
+		if err := config.WriteClient(flagExport, cfg); err != nil {
+			return fmt.Errorf("exporting client config: %w", err)
+		}
+		fmt.Printf("Exported client config: %s\n", flagExport)
 	}
 
 	dev, err := tunnel.Up(cfg)
@@ -155,4 +163,5 @@ func init() {
 
 	serverStartCmd.Flags().StringVarP(&flagImage, "image", "i", "ghcr.io/dwoodhouse22/mayfly-server:latest", "server Docker image")
 	serverStartCmd.Flags().StringVarP(&flagToken, "token", "t", "", "auth token (or set MAYFLY_TOKEN)")
+	serverStartCmd.Flags().StringVarP(&flagExport, "export", "e", "", "export the client WireGuard config to this path")
 }
