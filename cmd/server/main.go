@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"mayfly/internal/api"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -81,8 +80,8 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientIP := "10.0.0.2"
-	if err := s.wg.AddPeer(pubKey, net.ParseIP(clientIP)); err != nil {
+	clientIP, err := s.wg.AddPeer(pubKey)
+	if err != nil {
 		http.Error(w, "failed to add peer", http.StatusInternalServerError)
 		return
 	}
@@ -90,7 +89,7 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(api.RegisterResponse{
 		ServerPublicKey: s.wg.PublicKey.String(),
-		ClientIP:        clientIP,
+		ClientIP:        clientIP.String(),
 		DNS:             dnsIP,
 	})
 }
