@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
@@ -77,6 +78,16 @@ func setupRouting(tunDevice tun.Device, config *config.ClientConfig) error {
 		return fmt.Errorf("adding default tunnel route: %w", err)
 	}
 
+	// Mayfly does not currently support IPV6 addresses.
+	// Block IPv6 outright until the tunnel is actually dual-stack
+	// TODO: assign the client an IPv6 address and route ::/0 through mayfly0
+	if err := netlink.RouteReplace(&netlink.Route{
+		Dst:  &net.IPNet{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)},
+		Type: unix.RTN_BLACKHOLE,
+	}); err != nil {
+		return fmt.Errorf("blocking IPv6: %w", err)
+	}
+
 	usedSystemdResolved = isSystemdResolved()
 	if usedSystemdResolved {
 		if err := exec.Command("resolvectl", "dns", "mayfly0", config.DNS).Run(); err != nil {
@@ -123,6 +134,12 @@ func teardownRouting() error {
 		Dst:       &net.IPNet{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)},
 	}); err != nil {
 		return fmt.Errorf("removing tunnel default route: %w", err)
+	}
+	if err := netlink.RouteDel(&netlink.Route{
+		Dst:  &net.IPNet{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)},
+		Type: unix.RTN_BLACKHOLE,
+	}); err != nil {
+		return fmt.Errorf("removing IPv6 block: %w", err)
 	}
 	return restoreDNS()
 }
