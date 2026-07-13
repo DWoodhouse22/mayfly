@@ -25,6 +25,7 @@ type wgServer struct {
 	mu        sync.Mutex
 	dev       *device.Device
 	PublicKey wgtypes.Key
+	nextIP    byte
 }
 
 func newWGServer() (*wgServer, error) {
@@ -60,7 +61,11 @@ func newWGServer() (*wgServer, error) {
 		return nil, err
 	}
 
-	return &wgServer{dev: dev, PublicKey: privateKey.PublicKey()}, nil
+	return &wgServer{
+		dev:       dev,
+		nextIP:    2,
+		PublicKey: privateKey.PublicKey(),
+	}, nil
 }
 
 func configureInterface() error {
@@ -87,11 +92,22 @@ func runCmd(args ...string) error {
 	return nil
 }
 
-func (s *wgServer) AddPeer(pubKey wgtypes.Key, ip net.IP) error {
+func (s *wgServer) AddPeer(pubKey wgtypes.Key) (net.IP, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.dev.IpcSet(fmt.Sprintf(
+	if s.nextIP == 255 {
+		return nil, fmt.Errorf("no addresses available")
+	}
+
+	clientIpStr := fmt.Sprintf("10.0.0.%d", s.nextIP)
+	ip := net.ParseIP(clientIpStr)
+	if ip == nil {
+		return nil, fmt.Errorf("failed to construct Client IP Address")
+	}
+	s.nextIP++
+
+	return ip, s.dev.IpcSet(fmt.Sprintf(
 		"public_key=%s\nallowed_ip=%s/32\npersistent_keepalive_interval=25\n",
 		hex.EncodeToString(pubKey[:]),
 		ip.String(),

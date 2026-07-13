@@ -101,7 +101,8 @@ func runServerStart(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("\nVPN server is running.\nPress Ctrl+C to disconnect.\n\n")
+	fmt.Printf("\nVPN server is running.\nPress Ctrl+C to disconnect.\n")
+	fmt.Printf("Connect other clients using the following token:\n%s\n\n", flagToken)
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c

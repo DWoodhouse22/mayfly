@@ -51,6 +51,14 @@ Specify an SSH key with `--key path/to/key-file`. It will default to standard SS
 `--export` optional. Writes the WireGuard config file which can be imported to other WireGuard clients
 This SSHes into your VPS, pulls and starts the container, and creates the WireGuard tunnel. The process blocks until Ctrl+C which disconnects the tunnel and removes the container.
 
+**Add a client (e.g. a phone)**
+```
+mayfly client join --host <vps-ip> --user <ssh-user> --token <token-from-primary-session> --export /path/to/client2.conf
+```
+Requires a `mayfly server start` session already running on the same VPS, and the token it printed (or the one you passed explicitly via `--token`). This registers a new WireGuard identity against the running server and writes its config to `--export` - it doesn't start a local tunnel, so it's meant for a *different* device: transfer the file to your phone and import it into the WireGuard app ("Add a Tunnel" > "Create from file or archive").
+
+>Note: the server's lifecycle is entirely owned by the primary `mayfly server start` session. Stopping it (Ctrl+C, or `mayfly server stop`) tears down the container and disconnects every client that joined it, not just the primary device.
+
 **Stop a session**  
 Ctrl+C on the blocking `mayfly server start` process.  
 Fallback for unclean shutdowns is:
